@@ -24,8 +24,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Create the github-pages environment automatically if it does not exist
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure environment exists
+        run: |
+          curl -s -o /dev/null -w "%{http_code}\n" -X PUT "https://api.github.com/repos/${{ github.repository }}/environments/github-pages" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{"name":"github-pages"}' || true
+
   # Build job
   build:
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -49,9 +61,11 @@ jobs:
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5.0.0
 
-  # Deployment job (no environment: some accounts cannot auto-create the
-  # github-pages environment, which rejects the job before scheduling)
+  # Deployment job
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
     steps:
